@@ -5,3 +5,4 @@ A little compiler that could compile, hopefully
 ## Resources:
 
 * http://www.compilers.iecc.com/crenshaw/
+* https://www.coursera.org/course/compilers
