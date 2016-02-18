@@ -25,7 +25,7 @@ sub match {
     my ($x) = @_;
 
     $Look eq $x
-      or expected "'$x'";
+        or expected "'$x'";
 
     get_char();
 }
@@ -57,13 +57,21 @@ sub emitln {
 }
 
 sub term {
-    emitln('mov dh,' . get_number());
+    factor();
+    while ( $Look eq '*' or $Look eq '/' ) {
+        emitln('push eax');
+        given ($Look) {
+            multiply() when '*';
+            divide() when '/';
+            default { expected 'Mulop' }
+        }
+    }
 }
 
 sub expression {
     term();
-    while ($Look =~ m[\+|\-]) {
-        emitln('mov dh,dl');
+    while ( $Look eq '+' or $Look eq '-' ) {
+        emitln('push eax');
         given ($Look) {
             add()      when '+';
             subtract() when '-';
@@ -75,14 +83,36 @@ sub expression {
 sub add {
     match '+';
     term();
-    emitln('add dh,dl');
+    emitln('pop ebx');
+    emitln('add eax,ebx');
 }
 
 sub subtract {
     match '-';
     term();
-    emitln('sub dh,dl');
-    emitln('neg dh');
+    emitln('pop ebx');
+    emitln('sub eax,ebx');
+    emitln('neg eax');
+}
+
+sub factor {
+    emitln( 'mov eax, ' . get_number() );
+}
+
+sub multiply {
+    match('*');
+    factor();
+    emitln('pop ebx');
+    emitln('mul ebx');
+}
+
+sub divide {
+    match('/');
+    factor();
+    emitln('mov ebx, eax');
+    emitln('mov edx, 0');
+    emitln('pop eax');
+    emitln('div ebx');    # eax = ( eax + (edx<<32) ) / ebx
 }
 
 sub init {
