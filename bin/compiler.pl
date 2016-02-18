@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
+use v5.14;
+no warnings 'experimental';
 
 # we're replacing Crenshaw's Error with carp(), and Abort with croak()
 use Carp qw(carp croak);
@@ -9,8 +11,9 @@ my $Look; # lookahead character
 my $Code; # entire program is slurped here
 my $Current = 0;
 
+# this assumes input is ascii
 sub get_char {
-    substr $Code, $Current++, 1;
+    $Look = substr $Code, $Current++, 1;
 }
 
 sub expected {
@@ -53,6 +56,35 @@ sub emitln {
     print "\t$s\n";
 }
 
+sub term {
+    emitln('mov dh,' . get_number());
+}
+
+sub expression {
+    term();
+    while ($Look =~ m[\+|\-]) {
+        emitln('mov dh,dl');
+        given ($Look) {
+            add()      when '+';
+            subtract() when '-';
+            default { expected 'Addop' };
+        }
+    }
+}
+
+sub add {
+    match '+';
+    term();
+    emitln('add dh,dl');
+}
+
+sub subtract {
+    match '-';
+    term();
+    emitln('sub dh,dl');
+    emitln('neg dh');
+}
+
 sub init {
     local $/;
     $Code = <STDIN>;
@@ -61,6 +93,7 @@ sub init {
 
 sub main {
     init();
+    expression();
 }
 
 main();
