@@ -53,6 +53,26 @@ void expected(NSString* string)
 }
 
 /**
+ @brief Recognize white space
+ */
+BOOL isWhitespace(NSString *ch)
+{
+    return [[NSCharacterSet whitespaceCharacterSet]
+            characterIsMember:[ch characterAtIndex:0]];
+}
+
+/**
+ @brief whitespace skipping
+ */
+void skipWhiteSpace()
+{
+    while (isWhitespace(lookAheadCharacter))
+    {
+        getChar();
+    }
+}
+
+/**
  @brief Match a specific input character
  */
 void match(NSString* ch)
@@ -60,6 +80,7 @@ void match(NSString* ch)
     if ([lookAheadCharacter isEqualToString:ch])
     {
         getChar();
+        skipWhiteSpace();
     }
     else
     {
@@ -79,10 +100,18 @@ BOOL isAlpha(NSString* ch)
 /**
  @brief Recognize a Decimal Digit
  */
-BOOL iSDigit(NSString* ch)
+BOOL isDigit(NSString* ch)
 {
     return [kDecimalCharacterSet
             characterIsMember:[[ch uppercaseString] characterAtIndex:0]];
+}
+
+/**
+ @brief Recognize alphanumeric characters
+ */
+BOOL isAlphaNumeric(NSString* ch)
+{
+    return isAlpha(ch) || isDigit(ch);
 }
 
 /**
@@ -94,9 +123,14 @@ NSString* getName()
     {
         expected(@"Name");
     }
-    NSString* ret = [lookAheadCharacter uppercaseString];
-    getChar();
-    return ret;
+    NSMutableString* token = [NSMutableString string];
+    while (isAlphaNumeric(lookAheadCharacter))
+    {
+        [token appendString:[lookAheadCharacter uppercaseString]];
+        getChar();
+    }
+    skipWhiteSpace();
+    return token;
 }
 
 /**
@@ -104,13 +138,17 @@ NSString* getName()
  */
 NSString* getNum()
 {
-    if (!iSDigit(lookAheadCharacter))
+    if (!isDigit(lookAheadCharacter))
     {
         expected(@"Integer");
     }
-    NSString* ret = lookAheadCharacter;
-    getChar();
-    return ret;
+    NSMutableString* digits = [NSMutableString string];
+    while (isDigit(lookAheadCharacter)) {
+        [digits appendString:[lookAheadCharacter uppercaseString]];
+        getChar();
+    }
+    skipWhiteSpace();
+    return digits;
 }
 
 /**
@@ -131,6 +169,26 @@ void emitLn(NSString* string)
 }
 
 /**
+ @brief Parse and translate an identifier
+ */
+void ident()
+{
+    NSString *name = getName();
+    if ([lookAheadCharacter isEqualToString:@"("])
+    {
+        match(@"(");
+        match(@")");
+        // FIX
+        emitLn([NSString stringWithFormat:@"bsr %@", name]);
+    }
+    else
+    {
+        // FIX
+        emitLn([NSString stringWithFormat:@"mov eax, %@(PC)", name]);
+    }
+}
+
+/**
  @brief Parse and translate a math factor
  */
 void expression(); // forward declaration
@@ -141,6 +199,10 @@ void factor()
         match(@"(");
         expression();
         match(@")");
+    }
+    else if (isAlpha(lookAheadCharacter))
+    {
+        ident();
     }
     else
     {
@@ -254,11 +316,25 @@ void expression()
 }
 
 /**
+ @brief Parse and Translate an Assignment Statement
+ */
+void assignment()
+{
+    NSString *name = getName();
+    match(@"=");
+    expression();
+    // FIX
+    emitLn([NSString stringWithFormat:@"lea eax, %@(PC)", name]);
+    emitLn(@"mov eax, d0");
+}
+
+/**
  @brief Initialize
  */
 void init()
 {
     getChar();
+    skipWhiteSpace();
 }
 
 /**
@@ -271,7 +347,12 @@ int main(int argc, const char * argv[]) {
         kAddOpCharacterSet = [NSCharacterSet characterSetWithCharactersInString:@"+-"];
         kMultiplyOpCharacterSet = [NSCharacterSet characterSetWithCharactersInString:@"*/"];
         init();
-        expression();
+        assignment();
+        if (![lookAheadCharacter isEqualToString:@"\n"] &&
+            ![lookAheadCharacter isEqualToString:@"\r"])
+        {
+            expected(@"newline");
+        }
     }
     return 0;
 }
